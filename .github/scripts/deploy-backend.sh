@@ -74,6 +74,9 @@ NODE_VERSION=$(echo "$SETTINGS" | jq -r '.node_version // 22')
 APP_TYPE=$(echo "$SETTINGS" | jq -r '.app_type // "server"')
 ROOT_DIR=$(echo "$SETTINGS" | jq -r '.root_directory // "."')
 PKG_MANAGER=$(echo "$SETTINGS" | jq -r '.package_manager // "npm"')
+# The API wants the npm script name (e.g. "build"), not the full "npm run build".
+BUILD_SCRIPT=$(echo "$SETTINGS" | jq -r '.build_script // "build"')
+ENTRY_FILE=$(echo "$SETTINGS" | jq -r '.entry_file // "server.js"')
 
 echo "Starting build (node $NODE_VERSION, app_type $APP_TYPE)..."
 call show -X POST "$API_BASE/api/hosting/v1/accounts/$HOSTINGER_USERNAME/websites/$HOSTINGER_BACKEND_DOMAIN/nodejs/builds" \
@@ -84,8 +87,8 @@ call show -X POST "$API_BASE/api/hosting/v1/accounts/$HOSTINGER_USERNAME/website
     \"app_type\": \"$APP_TYPE\",
     \"root_directory\": \"$ROOT_DIR\",
     \"output_directory\": \"dist\",
-    \"build_script\": \"npm run build\",
-    \"entry_file\": \"server.js\",
+    \"build_script\": \"$BUILD_SCRIPT\",
+    \"entry_file\": \"$ENTRY_FILE\",
     \"package_manager\": \"$PKG_MANAGER\",
     \"source_type\": \"archive\",
     \"source_options\": {\"archive_path\": \"$ARCHIVE_NAME\"}
