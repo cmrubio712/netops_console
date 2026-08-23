@@ -10,10 +10,14 @@ import { sslRouter } from "./routes/ssl";
 import { statusRouter } from "./routes/status";
 
 const app = express();
+const startedAt = new Date().toISOString();
 
 app.use(cors({ origin: corsOrigins, methods: ["GET"] }));
 
-app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
+// startedAt lets a deploy be confirmed live (not just "build succeeded") by
+// checking the timestamp actually moved — useful given Hostinger's build
+// promotion can lag behind the build itself completing.
+app.get("/api/health", (_req, res) => res.json({ status: "ok", startedAt }));
 app.use("/api", statusRouter);
 app.use("/api", sslRouter);
 app.use("/api", deploymentsRouter);
