@@ -18,23 +18,34 @@ ARCHIVE_NAME="backend-$(date +%s).zip"
 # rather than hanging until the job's own limit. Captures curl's own exit
 # code separately from the HTTP status — set -e would otherwise kill the
 # script on a curl-level failure (timeout, DNS) before this function's own
-# error handling ever runs. On failure, prints status/curl-exit-code and
-# (unless told not to) the response body, then exits.
+# error handling ever runs. Curl-level failures (timeout/DNS/reset) are
+# retried a few times, since these have shown up intermittently on the
+# GitHub-runner-to-Hostinger network path even when the request itself is
+# fine — an HTTP-level error (4xx/5xx) is not retried, since that's a real
+# response, not a network blip. On final failure, prints status/curl-exit
+# and (unless told not to) the response body, then exits.
 call() {
   local show_body_on_error="$1"; shift
-  local tmp; tmp=$(mktemp)
-  local status curl_exit
+  local tmp status curl_exit attempt
 
-  set +e
-  status=$(curl -s --max-time 120 -o "$tmp" -w "%{http_code}" "$@")
-  curl_exit=$?
-  set -e
+  for attempt in 1 2 3; do
+    tmp=$(mktemp)
+    set +e
+    status=$(curl -s --max-time 120 -o "$tmp" -w "%{http_code}" "$@")
+    curl_exit=$?
+    set -e
 
-  if [[ "$curl_exit" -ne 0 ]]; then
-    echo "curl itself failed (exit $curl_exit, e.g. timeout/DNS/connection reset)" >&2
+    if [[ "$curl_exit" -eq 0 ]]; then
+      break
+    fi
+    echo "curl itself failed (exit $curl_exit, e.g. timeout/DNS/connection reset) — attempt $attempt/3" >&2
     rm -f "$tmp"
-    exit 1
-  fi
+    if [[ "$attempt" -eq 3 ]]; then
+      exit 1
+    fi
+    sleep 5
+  done
+
   if [[ "$status" -lt 200 || "$status" -ge 300 ]]; then
     echo "Request failed with HTTP $status" >&2
     if [[ "$show_body_on_error" == "show" ]]; then
