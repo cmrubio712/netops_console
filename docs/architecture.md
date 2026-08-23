@@ -45,6 +45,23 @@ Hostinger's REST API directly with an API token stored as a `HOSTINGER_API_TOKEN
 the user in hPanel and set by the user via `gh secret set`, not typed into chat, consistent with how the SSH
 deploy key was handled.
 
+**Known limitation, confirmed by repeated testing:** the REST API deploy path (`.github/scripts/deploy-backend.sh`)
+is not reliable enough to be the primary backend deploy mechanism. Observed failure modes across multiple
+test runs, including a clean isolated run with no concurrent deploys:
+- The TUS file upload step has timed out 3/3 retry attempts in a row (6+ min) with nothing else going on.
+- A build with a completely clean compile log has come back with `state: "failed"` from the builds-list
+  endpoint, with no error surfaced anywhere.
+- A build that *does* report `state: "completed"` has sat live-but-not-promoted for 5+ minutes before an
+  explicit restart call (added after this was diagnosed) actually activated it.
+
+This isn't something fixable from the deploy script's side — it looks like genuine instability in
+Hostinger's Node.js build/upload infrastructure or the network path from GitHub's runners to it. **The
+reliable path is manual: hPanel → the Node.js app → Upload your files**, using a freshly-built archive
+(`zip -r backend.zip . -x "node_modules/*" -x "dist/*" -x ".git/*" -x ".env"` from inside `backend/`, same
+settings each time: Express, Node 22.x, root `./`, npm, entry file `dist/server.js`). The GitHub Actions
+workflow is left in place and worth trying first (it does succeed sometimes), but don't wait long on it —
+fall back to manual upload if it hasn't gone live within a couple of minutes.
+
 ### Database: MySQL
 
 Included free with the Hostinger plan. Dataset stays tiny (handful of targets, checks every 5–15 min,

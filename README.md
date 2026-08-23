@@ -12,8 +12,9 @@ Live at [status.cmrubio.com](https://status.cmrubio.com).
 - **Database**: MySQL
 - **Collection**: a cron job on the hosting box runs uptime/SSL/DNS/WHOIS checks and pulls
   recent GitHub Actions runs every 5-15 minutes
-- **CI/CD**: GitHub Actions builds and deploys both apps on every push to `main` — frontend over
-  SFTP, backend via Hostinger's REST API
+- **CI/CD**: GitHub Actions builds and deploys the frontend over SFTP on every push to `main`.
+  Backend deploy is attempted via Hostinger's REST API but isn't reliable (see architecture doc) —
+  the dependable path is a manual archive upload through hPanel
 
 See [docs/architecture.md](docs/architecture.md) for the full design writeup, including why the
 backend is Node.js rather than the originally-planned Python (Hostinger's shared hosting doesn't
