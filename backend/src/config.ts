@@ -29,6 +29,8 @@ export interface TargetConfig {
 export const targets: TargetConfig[] = [
   { name: "cmrubio.com", url: "https://cmrubio.com" },
   { name: "status.cmrubio.com", url: "https://status.cmrubio.com" },
+  { name: "soccer.cmrubio.com", url: "https://soccer.cmrubio.com" },
+  { name: "shpenewmexico.org", url: "https://shpenewmexico.org" },
 ];
 
 // Repos to pull GitHub Actions run history from, "owner/repo" format.
