@@ -14,13 +14,27 @@ set -euo pipefail
 API_BASE="https://developers.hostinger.com"
 ARCHIVE_NAME="backend-$(date +%s).zip"
 
-# Runs a curl call, always capturing the HTTP status. On failure, prints the
-# status and (unless told not to) the response body, then exits.
+# Runs a curl call with an explicit timeout so failures are deterministic
+# rather than hanging until the job's own limit. Captures curl's own exit
+# code separately from the HTTP status — set -e would otherwise kill the
+# script on a curl-level failure (timeout, DNS) before this function's own
+# error handling ever runs. On failure, prints status/curl-exit-code and
+# (unless told not to) the response body, then exits.
 call() {
   local show_body_on_error="$1"; shift
   local tmp; tmp=$(mktemp)
-  local status
-  status=$(curl -s -o "$tmp" -w "%{http_code}" "$@")
+  local status curl_exit
+
+  set +e
+  status=$(curl -s --max-time 120 -o "$tmp" -w "%{http_code}" "$@")
+  curl_exit=$?
+  set -e
+
+  if [[ "$curl_exit" -ne 0 ]]; then
+    echo "curl itself failed (exit $curl_exit, e.g. timeout/DNS/connection reset)" >&2
+    rm -f "$tmp"
+    exit 1
+  fi
   if [[ "$status" -lt 200 || "$status" -ge 300 ]]; then
     echo "Request failed with HTTP $status" >&2
     if [[ "$show_body_on_error" == "show" ]]; then
