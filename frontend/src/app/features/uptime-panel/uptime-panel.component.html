@@ -1,0 +1,45 @@
+<section class="panel">
+  <h2>Uptime &amp; Latency</h2>
+
+  @if (loading) {
+    <p class="hint">Loading...</p>
+  } @else if (error) {
+    <p class="hint hint--error">Could not reach the API.</p>
+  } @else if (statuses.length === 0) {
+    <p class="hint">No targets configured yet.</p>
+  } @else {
+    <table>
+      <thead>
+        <tr>
+          <th>Target</th>
+          <th>Status</th>
+          <th>DNS</th>
+          <th>Connect</th>
+          <th>TLS</th>
+          <th>TTFB</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of statuses; track row.target.id) {
+          <tr>
+            <td>{{ row.target.name }}</td>
+            @if (row.latest) {
+              <td [class.status-up]="row.latest.is_up" [class.status-down]="!row.latest.is_up">
+                {{ row.latest.is_up ? 'UP' : 'DOWN' }}
+                <span class="hint">{{ row.latest.http_status }}</span>
+              </td>
+              <td>{{ row.latest.dns_ms }}ms</td>
+              <td>{{ row.latest.connect_ms }}ms</td>
+              <td>{{ row.latest.tls_ms }}ms</td>
+              <td>{{ row.latest.ttfb_ms }}ms</td>
+              <td>{{ row.latest.total_ms }}ms</td>
+            } @else {
+              <td colspan="6" class="hint">No checks recorded yet</td>
+            }
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>

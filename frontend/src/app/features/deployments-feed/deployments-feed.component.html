@@ -1,0 +1,36 @@
+<section class="panel">
+  <h2>GitHub Actions Deployments</h2>
+
+  @if (loading) {
+    <p class="hint">Loading...</p>
+  } @else if (error) {
+    <p class="hint hint--error">Could not reach the API.</p>
+  } @else if (runs.length === 0) {
+    <p class="hint">No workflow runs recorded yet.</p>
+  } @else {
+    <table>
+      <thead>
+        <tr>
+          <th>Repo</th>
+          <th>Workflow</th>
+          <th>Result</th>
+          <th>Started</th>
+          <th>Duration</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (run of runs; track run.html_url) {
+          <tr>
+            <td>{{ run.repo }}</td>
+            <td>{{ run.workflow_name }}</td>
+            <td [class]="statusClass(run)">
+              <a [href]="run.html_url" target="_blank" rel="noopener">{{ statusLabel(run) }}</a>
+            </td>
+            <td>{{ run.started_at | date: 'MMM d, HH:mm' }}</td>
+            <td>{{ run.duration_s }}s</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>

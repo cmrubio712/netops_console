@@ -1,0 +1,26 @@
+:root {
+  --bg: #0a0e14;
+  --panel-bg: #10161f;
+  --border: #1f2937;
+  --text: #d7dee8;
+  --text-dim: #6b7889;
+  --accent: #35d488;
+  --danger: #ef4b5f;
+  --warn: #e8a33d;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 14px;
+}

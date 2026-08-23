@@ -1,0 +1,37 @@
+<div class="shell">
+  <header>
+    <h1>NetOps Console</h1>
+    <p class="subtitle">Live infrastructure &amp; deployment observability</p>
+  </header>
+
+  @if (summary) {
+    <div class="stat-row">
+      <div class="stat">
+        <span class="stat-label">Uptime (24h)</span>
+        <span class="stat-value">{{ summary.uptime_pct_24h !== null ? summary.uptime_pct_24h + '%' : '–' }}</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Targets Monitored</span>
+        <span class="stat-value">{{ summary.targets_monitored }}</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Next Cert Expiry</span>
+        <span class="stat-value">
+          {{ summary.next_cert_expiring ? summary.next_cert_expiring.days_remaining + 'd' : '–' }}
+        </span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Next Domain Expiry</span>
+        <span class="stat-value">
+          {{ summary.next_domain_expiring ? summary.next_domain_expiring.days_remaining + 'd' : '–' }}
+        </span>
+      </div>
+    </div>
+  }
+
+  <div class="panels">
+    <app-uptime-panel></app-uptime-panel>
+    <app-ssl-panel></app-ssl-panel>
+    <app-deployments-feed></app-deployments-feed>
+  </div>
+</div>

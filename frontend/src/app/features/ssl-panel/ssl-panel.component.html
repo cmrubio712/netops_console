@@ -1,0 +1,40 @@
+<section class="panel">
+  <h2>SSL &amp; Domain Expiry</h2>
+
+  @if (loading) {
+    <p class="hint">Loading...</p>
+  } @else if (error) {
+    <p class="hint hint--error">Could not reach the API.</p>
+  } @else if (entries.length === 0) {
+    <p class="hint">No certificate data yet.</p>
+  } @else {
+    <table>
+      <thead>
+        <tr>
+          <th>Target</th>
+          <th>Issuer</th>
+          <th>Protocol</th>
+          <th>Cert Expires</th>
+          <th>Domain Registrar</th>
+          <th>Domain Expires</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (entry of entries; track entry.target) {
+          <tr>
+            <td>{{ entry.target }}</td>
+            <td>{{ entry.issuer || '–' }}</td>
+            <td>{{ entry.protocol || '–' }}</td>
+            <td [class]="statusClass(entry.cert_days_remaining)">
+              {{ entry.cert_days_remaining !== null ? entry.cert_days_remaining + 'd' : '–' }}
+            </td>
+            <td>{{ entry.domain_registrar || '–' }}</td>
+            <td [class]="statusClass(entry.domain_days_remaining)">
+              {{ entry.domain_days_remaining !== null ? entry.domain_days_remaining + 'd' : '–' }}
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>
