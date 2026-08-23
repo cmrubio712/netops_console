@@ -7,14 +7,18 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: "3.9"
-      - run: pip install -r backend/requirements.txt
-      - name: Smoke-import the app
-        run: python -c "import sys; sys.path.insert(0, 'backend'); import app.main"
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run build
 
   frontend:
     runs-on: ubuntu-latest

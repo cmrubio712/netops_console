@@ -6,6 +6,7 @@ on:
     paths:
       - "backend/**"
       - ".github/workflows/backend-deploy.yml"
+      - ".github/scripts/deploy-backend.sh"
   workflow_dispatch:
 
 jobs:
@@ -14,25 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy over SFTP
-        uses: wlixcc/SFTP-Deploy-Action@v1.2.6
-        with:
-          server: ${{ secrets.HOSTINGER_SSH_HOST }}
-          username: ${{ secrets.HOSTINGER_SSH_USER }}
-          ssh_private_key: ${{ secrets.HOSTINGER_SSH_KEY }}
-          port: ${{ secrets.HOSTINGER_SSH_PORT }}
-          local_path: "./backend/*"
-          remote_path: ${{ secrets.HOSTINGER_BACKEND_PATH }}
-          sftp_only: true
-          exclude: "**/.venv/**,**/__pycache__/**,**/.env"
-
-      - name: Restart Passenger app
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.HOSTINGER_SSH_HOST }}
-          username: ${{ secrets.HOSTINGER_SSH_USER }}
-          key: ${{ secrets.HOSTINGER_SSH_KEY }}
-          port: ${{ secrets.HOSTINGER_SSH_PORT }}
-          script: |
-            mkdir -p ${{ secrets.HOSTINGER_BACKEND_PATH }}/tmp
-            touch ${{ secrets.HOSTINGER_BACKEND_PATH }}/tmp/restart.txt
+      - name: Deploy to Hostinger
+        env:
+          HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
+          HOSTINGER_USERNAME: ${{ secrets.HOSTINGER_USERNAME }}
+          HOSTINGER_BACKEND_DOMAIN: ${{ secrets.HOSTINGER_BACKEND_DOMAIN }}
+        run: ./.github/scripts/deploy-backend.sh

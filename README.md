@@ -8,19 +8,22 @@ Live at [status.cmrubio.com](https://status.cmrubio.com).
 ## Stack
 
 - **Frontend**: Angular (standalone components), polling a read-only JSON API
-- **Backend**: FastAPI (Python), deployed under Passenger via an ASGI-to-WSGI shim
+- **Backend**: Node.js (Express) + TypeScript, deployed as a Hostinger Node.js Web App
 - **Database**: MySQL
 - **Collection**: a cron job on the hosting box runs uptime/SSL/DNS/WHOIS checks and pulls
   recent GitHub Actions runs every 5-15 minutes
-- **CI/CD**: GitHub Actions builds and deploys both apps over SFTP on every push to `main`
+- **CI/CD**: GitHub Actions builds and deploys both apps on every push to `main` — frontend over
+  SFTP, backend via Hostinger's REST API
 
-See [docs/architecture.md](docs/architecture.md) for the full design writeup, including why
-collection runs on the host itself rather than from GitHub Actions.
+See [docs/architecture.md](docs/architecture.md) for the full design writeup, including why the
+backend is Node.js rather than the originally-planned Python (Hostinger's shared hosting doesn't
+grant the root access Python needs), and why collection runs on the host itself rather than from
+GitHub Actions.
 
 ## Repo layout
 
 ```
-backend/    FastAPI app, collectors, Passenger entrypoint
+backend/    Express app, collectors, MySQL schema
 frontend/   Angular app
 docs/       architecture notes
 ```
@@ -30,8 +33,9 @@ docs/       architecture notes
 Backend:
 ```
 cd backend
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-DATABASE_URL="sqlite:////tmp/netops_dev.db" .venv/bin/uvicorn app.main:app --reload
+npm install
+cp .env.example .env   # fill in DB credentials
+npm run build && npm start
 ```
 
 Frontend:
