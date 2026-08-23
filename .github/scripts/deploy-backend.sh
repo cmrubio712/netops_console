@@ -2,8 +2,9 @@
 # Deploys backend/ to Hostinger as a Node.js Web App via the Hostinger REST API.
 # Schemas pulled from the official hostinger-api-sdk generated docs, since the
 # interactive API reference at developers.hostinger.com didn't render the
-# request bodies reliably. Untested against a live Hostinger account as of
-# writing (no app/token exists yet) — expect to debug the first real run.
+# request bodies reliably. This is a public repo, so error bodies are only
+# printed where they can't contain live credentials (the upload-urls success
+# response carries short-lived auth_key/rest_auth_key — never dumped).
 set -euo pipefail
 
 : "${HOSTINGER_API_TOKEN:?}"
@@ -13,13 +14,33 @@ set -euo pipefail
 API_BASE="https://developers.hostinger.com"
 ARCHIVE_NAME="backend-$(date +%s).zip"
 
+# Runs a curl call, always capturing the HTTP status. On failure, prints the
+# status and (unless told not to) the response body, then exits.
+call() {
+  local show_body_on_error="$1"; shift
+  local tmp; tmp=$(mktemp)
+  local status
+  status=$(curl -s -o "$tmp" -w "%{http_code}" "$@")
+  if [[ "$status" -lt 200 || "$status" -ge 300 ]]; then
+    echo "Request failed with HTTP $status" >&2
+    if [[ "$show_body_on_error" == "show" ]]; then
+      echo "Response body:" >&2
+      cat "$tmp" >&2
+    fi
+    rm -f "$tmp"
+    exit 1
+  fi
+  cat "$tmp"
+  rm -f "$tmp"
+}
+
 echo "Archiving backend/ (excluding node_modules, dist, .git, .env)..."
 cd backend
 zip -rq "../$ARCHIVE_NAME" . -x "node_modules/*" -x "dist/*" -x ".git/*" -x ".env"
 cd ..
 
 echo "Requesting upload URL..."
-UPLOAD_RESP=$(curl -sf -X POST "$API_BASE/api/hosting/v1/files/upload-urls" \
+UPLOAD_RESP=$(call show -X POST "$API_BASE/api/hosting/v1/files/upload-urls" \
   -H "Authorization: Bearer $HOSTINGER_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d "{\"username\":\"$HOSTINGER_USERNAME\",\"domain\":\"$HOSTINGER_BACKEND_DOMAIN\"}")
@@ -31,20 +52,23 @@ REST_AUTH_KEY=$(echo "$UPLOAD_RESP" | jq -r .rest_auth_key)
 echo "Uploading $ARCHIVE_NAME via TUS..."
 SIZE=$(stat -c%s "$ARCHIVE_NAME")
 
-curl -sf -X POST "$UPLOAD_URL/$ARCHIVE_NAME?override=true" \
+# Upload steps: never show body on error, since a failed request can still
+# echo the X-Auth/X-Auth-Rest headers back.
+call noshow -X POST "$UPLOAD_URL/$ARCHIVE_NAME?override=true" \
   -H "X-Auth: $AUTH_KEY" -H "X-Auth-Rest: $REST_AUTH_KEY" \
   -H "Tus-Resumable: 1.0.0" -H "Upload-Length: $SIZE" -H "Upload-Offset: 0" > /dev/null
 
-curl -sf -X PATCH "$UPLOAD_URL/$ARCHIVE_NAME?override=true" \
+call noshow -X PATCH "$UPLOAD_URL/$ARCHIVE_NAME?override=true" \
   -H "X-Auth: $AUTH_KEY" -H "X-Auth-Rest: $REST_AUTH_KEY" \
   -H "Tus-Resumable: 1.0.0" -H "Content-Type: application/offset+octet-stream" \
   -H "Upload-Offset: 0" --data-binary "@$ARCHIVE_NAME" > /dev/null
 
 echo "Auto-detecting build settings from the uploaded archive..."
-SETTINGS=$(curl -sf -G \
+SETTINGS=$(call show -G \
   "$API_BASE/api/hosting/v1/accounts/$HOSTINGER_USERNAME/websites/$HOSTINGER_BACKEND_DOMAIN/nodejs/builds/settings/from-archive" \
   -H "Authorization: Bearer $HOSTINGER_API_TOKEN" \
   --data-urlencode "archive_path=$ARCHIVE_NAME")
+echo "Detected: $SETTINGS"
 
 NODE_VERSION=$(echo "$SETTINGS" | jq -r '.node_version // 22')
 APP_TYPE=$(echo "$SETTINGS" | jq -r '.app_type // "server"')
@@ -52,7 +76,7 @@ ROOT_DIR=$(echo "$SETTINGS" | jq -r '.root_directory // "."')
 PKG_MANAGER=$(echo "$SETTINGS" | jq -r '.package_manager // "npm"')
 
 echo "Starting build (node $NODE_VERSION, app_type $APP_TYPE)..."
-curl -sf -X POST "$API_BASE/api/hosting/v1/accounts/$HOSTINGER_USERNAME/websites/$HOSTINGER_BACKEND_DOMAIN/nodejs/builds" \
+call show -X POST "$API_BASE/api/hosting/v1/accounts/$HOSTINGER_USERNAME/websites/$HOSTINGER_BACKEND_DOMAIN/nodejs/builds" \
   -H "Authorization: Bearer $HOSTINGER_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d "{
