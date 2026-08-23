@@ -1,5 +1,8 @@
 export const db = {
-  host: process.env.DB_HOST ?? "localhost",
+  // "localhost" can resolve to the IPv6 loopback (::1) depending on the
+  // host's DNS config, which MySQL treats as a different grant than
+  // 'user'@'localhost' — 127.0.0.1 sidesteps the ambiguity.
+  host: process.env.DB_HOST ?? "127.0.0.1",
   port: Number(process.env.DB_PORT ?? "3306"),
   user: process.env.DB_USER ?? "",
   password: process.env.DB_PASSWORD ?? "",
