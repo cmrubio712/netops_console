@@ -104,7 +104,7 @@ BUILD_SCRIPT=$(echo "$SETTINGS" | jq -r '.build_script // "build"')
 ENTRY_FILE=$(echo "$SETTINGS" | jq -r '.entry_file // "server.js"')
 
 echo "Starting build (node $NODE_VERSION, app_type $APP_TYPE)..."
-call show -X POST "$API_BASE/api/hosting/v1/accounts/$HOSTINGER_USERNAME/websites/$HOSTINGER_BACKEND_DOMAIN/nodejs/builds" \
+BUILD_RESP=$(call show -X POST "$API_BASE/api/hosting/v1/accounts/$HOSTINGER_USERNAME/websites/$HOSTINGER_BACKEND_DOMAIN/nodejs/builds" \
   -H "Authorization: Bearer $HOSTINGER_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d "{
@@ -117,7 +117,33 @@ call show -X POST "$API_BASE/api/hosting/v1/accounts/$HOSTINGER_USERNAME/website
     \"package_manager\": \"$PKG_MANAGER\",
     \"source_type\": \"archive\",
     \"source_options\": {\"archive_path\": \"$ARCHIVE_NAME\"}
-  }"
+  }")
+echo "$BUILD_RESP"
+BUILD_UUID=$(echo "$BUILD_RESP" | jq -r .uuid)
 
-echo
-echo "Build started. Check hPanel's Node.js app dashboard for build status/logs."
+# A completed build doesn't automatically restart the running process —
+# Hostinger treats "build" and "restart" as separate operations. Without an
+# explicit restart, the new build can sit finished-but-not-live indefinitely.
+echo "Waiting for build $BUILD_UUID to finish (states: pending, running, completed, failed)..."
+for i in $(seq 1 30); do
+  BUILDS=$(call noshow "$API_BASE/api/hosting/v1/accounts/$HOSTINGER_USERNAME/websites/$HOSTINGER_BACKEND_DOMAIN/nodejs/builds" \
+    -H "Authorization: Bearer $HOSTINGER_API_TOKEN")
+  STATE=$(echo "$BUILDS" | jq -r --arg uuid "$BUILD_UUID" '.data[] | select(.uuid == $uuid) | .state')
+
+  if [[ "$STATE" == "completed" ]]; then
+    echo "Build completed after ~$((i * 5))s. Restarting the app..."
+    call show -X POST "$API_BASE/api/hosting/v1/accounts/$HOSTINGER_USERNAME/websites/$HOSTINGER_BACKEND_DOMAIN/nodejs/server/restart" \
+      -H "Authorization: Bearer $HOSTINGER_API_TOKEN" > /dev/null
+    echo "Restart triggered."
+    exit 0
+  fi
+  if [[ "$STATE" == "failed" ]]; then
+    echo "Build failed server-side (state: failed). Check hPanel's Node.js app dashboard for the build log." >&2
+    exit 1
+  fi
+
+  sleep 5
+done
+
+echo "Build didn't reach a terminal state (last seen: '$STATE') within 150s. Check hPanel manually." >&2
+exit 1
