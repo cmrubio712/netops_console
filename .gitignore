@@ -3,3 +3,4 @@ dist/
 .DS_Store
 backend-initial-upload.zip
 .secrets/
+.claude/
