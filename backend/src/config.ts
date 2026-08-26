@@ -31,6 +31,7 @@ export const targets: TargetConfig[] = [
   { name: "status.cmrubio.com", url: "https://status.cmrubio.com" },
   { name: "soccer.cmrubio.com", url: "https://soccer.cmrubio.com" },
   { name: "shpenewmexico.org", url: "https://shpenewmexico.org" },
+  { name: "tyc.cmrubio.com", url: "https://tyc.cmrubio.com" },
 ];
 
 // Repos to pull GitHub Actions run history from, "owner/repo" format.
