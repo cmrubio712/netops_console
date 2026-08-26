@@ -9,6 +9,7 @@ import "dotenv/config";
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 
 import { fetchRecentRuns } from "./collectors/githubCollector";
+import { checkSecurityHeaders } from "./collectors/securityHeadersCollector";
 import { checkSslCert } from "./collectors/sslCollector";
 import { measureHttpsRequest } from "./collectors/uptimeCollector";
 import { checkDomainExpiry } from "./collectors/whoisCollector";
@@ -87,6 +88,21 @@ async function run(): Promise<void> {
         [targetId, whois.registrar, whois.expires_at, whois.days_remaining],
       );
     }
+
+    const headers = await checkSecurityHeaders(entry.url);
+    if (!headers.error) {
+      await pool.query(
+        `INSERT INTO security_headers
+         (target_id, hsts, hsts_max_age, csp, x_frame_options, x_content_type_options,
+          referrer_policy, permissions_policy, score, grade)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          targetId, headers.hsts, headers.hsts_max_age, headers.csp, headers.x_frame_options,
+          headers.x_content_type_options, headers.referrer_policy, headers.permissions_policy,
+          headers.score, headers.grade,
+        ],
+      );
+    }
   }
 
   for (const fullName of githubRepos) {
@@ -119,6 +135,10 @@ async function run(): Promise<void> {
   );
   await pool.query(
     "DELETE FROM domain_whois WHERE checked_at < NOW() - INTERVAL ? DAY",
+    [retentionDays],
+  );
+  await pool.query(
+    "DELETE FROM security_headers WHERE checked_at < NOW() - INTERVAL ? DAY",
     [retentionDays],
   );
 

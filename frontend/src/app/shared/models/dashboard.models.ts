@@ -26,6 +26,20 @@ export interface SslEntry {
   domain_days_remaining: number | null;
 }
 
+export interface SecurityHeadersEntry {
+  target: string;
+  hsts: boolean;
+  hsts_max_age: number | null;
+  csp: boolean;
+  x_frame_options: string | null;
+  x_content_type_options: string | null;
+  referrer_policy: string | null;
+  permissions_policy: boolean;
+  score: number | null;
+  grade: string | null;
+  checked_at: string;
+}
+
 export interface DeploymentRun {
   repo: string | null;
   workflow_name: string | null;

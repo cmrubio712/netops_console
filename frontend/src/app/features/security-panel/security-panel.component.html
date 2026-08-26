@@ -1,0 +1,38 @@
+<section class="panel">
+  <h2>HTTP Security Posture</h2>
+
+  @if (loading) {
+    <p class="hint">Loading...</p>
+  } @else if (error) {
+    <p class="hint hint--error">Could not reach the API.</p>
+  } @else if (entries.length === 0) {
+    <p class="hint">No security header data yet.</p>
+  } @else {
+    <table>
+      <thead>
+        <tr>
+          <th>Target</th>
+          <th>Grade</th>
+          <th>HSTS</th>
+          <th>CSP</th>
+          <th>X-Frame-Options</th>
+          <th>X-Content-Type-Options</th>
+          <th>Referrer-Policy</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (entry of entries; track entry.target) {
+          <tr>
+            <td>{{ entry.target }}</td>
+            <td [class]="gradeClass(entry.grade)">{{ entry.grade || '–' }}</td>
+            <td>{{ entry.hsts ? '✓' : '✗' }}</td>
+            <td>{{ entry.csp ? '✓' : '✗' }}</td>
+            <td>{{ entry.x_frame_options || '✗' }}</td>
+            <td>{{ entry.x_content_type_options || '✗' }}</td>
+            <td>{{ entry.referrer_policy || '✗' }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>

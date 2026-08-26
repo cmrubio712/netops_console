@@ -49,6 +49,24 @@ CREATE TABLE IF NOT EXISTS domain_whois (
   FOREIGN KEY (target_id) REFERENCES targets(id)
 );
 
+CREATE TABLE IF NOT EXISTS security_headers (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  target_id INT NOT NULL,
+  checked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  hsts BOOLEAN NOT NULL DEFAULT FALSE,
+  hsts_max_age INT,
+  csp BOOLEAN NOT NULL DEFAULT FALSE,
+  x_frame_options VARCHAR(64),
+  x_content_type_options VARCHAR(64),
+  referrer_policy VARCHAR(128),
+  permissions_policy BOOLEAN NOT NULL DEFAULT FALSE,
+  score INT,
+  grade CHAR(1),
+  INDEX (target_id),
+  INDEX (checked_at),
+  FOREIGN KEY (target_id) REFERENCES targets(id)
+);
+
 CREATE TABLE IF NOT EXISTS github_repos (
   id INT AUTO_INCREMENT PRIMARY KEY,
   full_name VARCHAR(255) NOT NULL UNIQUE

@@ -3,7 +3,14 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
-import { DeploymentRun, SslEntry, Summary, Target, UptimeCheck } from '../../shared/models/dashboard.models';
+import {
+  DeploymentRun,
+  SecurityHeadersEntry,
+  SslEntry,
+  Summary,
+  Target,
+  UptimeCheck,
+} from '../../shared/models/dashboard.models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -25,6 +32,10 @@ export class ApiService {
 
   getSsl(): Observable<SslEntry[]> {
     return this.http.get<SslEntry[]>(`${this.baseUrl}/ssl`);
+  }
+
+  getSecurityHeaders(): Observable<SecurityHeadersEntry[]> {
+    return this.http.get<SecurityHeadersEntry[]>(`${this.baseUrl}/security`);
   }
 
   getDeployments(limit: number = 20): Observable<DeploymentRun[]> {

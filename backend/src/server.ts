@@ -6,6 +6,7 @@ import express from "express";
 
 import { corsOrigins, port } from "./config";
 import { deploymentsRouter } from "./routes/deployments";
+import { securityRouter } from "./routes/security";
 import { sslRouter } from "./routes/ssl";
 import { statusRouter } from "./routes/status";
 
@@ -20,6 +21,7 @@ app.use(cors({ origin: corsOrigins, methods: ["GET"] }));
 app.get("/api/health", (_req, res) => res.json({ status: "ok", startedAt }));
 app.use("/api", statusRouter);
 app.use("/api", sslRouter);
+app.use("/api", securityRouter);
 app.use("/api", deploymentsRouter);
 
 // Catches errors forwarded by asyncHandler (e.g. a DB outage) so a single
