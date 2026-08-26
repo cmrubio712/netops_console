@@ -62,6 +62,21 @@ settings each time: Express, Node 22.x, root `./`, npm, entry file `dist/server.
 workflow is left in place and worth trying first (it does succeed sometimes), but don't wait long on it —
 fall back to manual upload if it hasn't gone live within a couple of minutes.
 
+### Cron Jobs gotcha: no shell, 255-char command limit
+
+Hostinger's Cron Job Manager executes the "Command to Run" field directly, not through a shell — so
+`VAR=value VAR2=value2 /path/to/node script.js` (which relies on shell parsing to treat the `VAR=value`
+prefixes as environment assignments) fails with `No such file or directory`, because it tries to literally
+exec a file named `VAR=value`. Fix: wrap in `/bin/sh -c "..."` so an actual shell exists to interpret it.
+
+That wrapped form is usually too long — the command field caps at 255 characters. Resolved by writing the
+full env-var-prefixed invocation into a small wrapper script on the server (`/home/<user>/run-collector.sh`,
+`chmod 700` since it holds the DB password) and pointing cron at just `/bin/sh /home/<user>/run-collector.sh`.
+
+Also: the "PHP" vs "Custom" radio button at the top of the cron form matters — PHP mode silently prepends a
+fixed `/usr/bin/php /home/<user>/` prefix to whatever you type. Must be on "Custom" or the command gets
+mangled into nonsense.
+
 ### Database: MySQL
 
 Included free with the Hostinger plan. Dataset stays tiny (handful of targets, checks every 5–15 min,
