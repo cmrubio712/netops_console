@@ -44,6 +44,17 @@ async function getOrCreateRepo(fullName: string): Promise<number> {
 }
 
 async function run(): Promise<void> {
+  // Node's TLS/crypto module pays a one-time initialization cost on the
+  // first handshake in a process, inflating that target's tls_ms by
+  // 500-1000ms+ regardless of the server's actual performance — confirmed
+  // by swapping check order and watching the "slow" target become fast.
+  // A throwaway handshake here absorbs that cost before any real
+  // measurement is recorded, so whichever target is first in the config
+  // isn't systematically penalized on every run.
+  if (targets.length > 0) {
+    await measureHttpsRequest(targets[0].url);
+  }
+
   for (const entry of targets) {
     const targetId = await getOrCreateTarget(entry);
 
