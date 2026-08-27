@@ -51,13 +51,20 @@ test runs, including a clean isolated run with no concurrent deploys:
 - A build that *does* report `state: "completed"` has sat live-but-not-promoted for 5+ minutes before an
   explicit restart call (added after this was diagnosed) actually activated it.
 
-This isn't something fixable from the deploy script's side — it looks like genuine instability in
-Hostinger's Node.js build/upload infrastructure or the network path from GitHub's runners to it. **The
-reliable path is manual: hPanel → the Node.js app → Upload your files**, using a freshly-built archive
-(`zip -r backend.zip . -x "node_modules/*" -x "dist/*" -x ".git/*" -x ".env"` from inside `backend/`, same
-settings each time: Express, Node 22.x, root `./`, npm, entry file `dist/server.js`). The GitHub Actions
-workflow is left in place and worth trying first (it does succeed sometimes), but don't wait long on it —
-fall back to manual upload if it hasn't gone live within a couple of minutes.
+The root cause isn't fixable from the deploy script's side — it looks like genuine instability in
+Hostinger's Node.js build/upload infrastructure, since the same archive and settings have succeeded on other
+runs with no code change in between. What the script *can* do is retry: `deploy-backend.sh` re-triggers the
+build+poll cycle against the already-uploaded archive up to 3 times (with the full build record printed on
+each failure, in case Hostinger's API ever surfaces a reason) before giving up, since a fresh attempt has a
+real shot at succeeding even when the previous one didn't. That raises the odds of an unattended push
+actually going live, but doesn't guarantee it — a worst-case run (3 full attempts, each timing out its
+150s poll) takes around 8-9 minutes before failing.
+
+**The reliable fallback remains manual: hPanel → the Node.js app → Upload your files**, using a
+freshly-built archive (`zip -r backend.zip . -x "node_modules/*" -x "dist/*" -x ".git/*" -x ".env"` from
+inside `backend/`, same settings each time: Express, Node 22.x, root `./`, npm, entry file `dist/server.js`).
+Use this if the GitHub Actions run fails after exhausting its retries, or if you don't want to wait out a
+worst-case run.
 
 ### Cron Jobs gotcha: no shell, 255-char command limit
 

@@ -103,47 +103,71 @@ PKG_MANAGER=$(echo "$SETTINGS" | jq -r '.package_manager // "npm"')
 BUILD_SCRIPT=$(echo "$SETTINGS" | jq -r '.build_script // "build"')
 ENTRY_FILE=$(echo "$SETTINGS" | jq -r '.entry_file // "server.js"')
 
-echo "Starting build (node $NODE_VERSION, app_type $APP_TYPE)..."
-BUILD_RESP=$(call show -X POST "$API_BASE/api/hosting/v1/accounts/$HOSTINGER_USERNAME/websites/$HOSTINGER_BACKEND_DOMAIN/nodejs/builds" \
-  -H "Authorization: Bearer $HOSTINGER_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"node_version\": $NODE_VERSION,
-    \"app_type\": \"$APP_TYPE\",
-    \"root_directory\": \"$ROOT_DIR\",
-    \"output_directory\": \"dist\",
-    \"build_script\": \"$BUILD_SCRIPT\",
-    \"entry_file\": \"$ENTRY_FILE\",
-    \"package_manager\": \"$PKG_MANAGER\",
-    \"source_type\": \"archive\",
-    \"source_options\": {\"archive_path\": \"$ARCHIVE_NAME\"}
-  }")
-echo "$BUILD_RESP"
-BUILD_UUID=$(echo "$BUILD_RESP" | jq -r .uuid)
+# Hostinger's build infra has shown intermittent server-side failures even
+# against a clean compile — a build with no errors in its own compile log has
+# come back state:"failed" with nothing diagnosable surfaced via the API, and
+# the exact same archive/settings have succeeded on other runs with no code
+# change in between. That points to transient infra flakiness rather than a
+# deterministic bug, so retry the build+poll cycle against the already-
+# uploaded archive a few times before giving up — no need to re-upload.
+run_build_attempt() {
+  echo "Starting build (node $NODE_VERSION, app_type $APP_TYPE)..."
+  local build_resp build_uuid state builds build_obj i
+  build_resp=$(call show -X POST "$API_BASE/api/hosting/v1/accounts/$HOSTINGER_USERNAME/websites/$HOSTINGER_BACKEND_DOMAIN/nodejs/builds" \
+    -H "Authorization: Bearer $HOSTINGER_API_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"node_version\": $NODE_VERSION,
+      \"app_type\": \"$APP_TYPE\",
+      \"root_directory\": \"$ROOT_DIR\",
+      \"output_directory\": \"dist\",
+      \"build_script\": \"$BUILD_SCRIPT\",
+      \"entry_file\": \"$ENTRY_FILE\",
+      \"package_manager\": \"$PKG_MANAGER\",
+      \"source_type\": \"archive\",
+      \"source_options\": {\"archive_path\": \"$ARCHIVE_NAME\"}
+    }")
+  echo "$build_resp"
+  build_uuid=$(echo "$build_resp" | jq -r .uuid)
 
-# A completed build doesn't automatically restart the running process —
-# Hostinger treats "build" and "restart" as separate operations. Without an
-# explicit restart, the new build can sit finished-but-not-live indefinitely.
-echo "Waiting for build $BUILD_UUID to finish (states: pending, running, completed, failed)..."
-for i in $(seq 1 30); do
-  BUILDS=$(call noshow "$API_BASE/api/hosting/v1/accounts/$HOSTINGER_USERNAME/websites/$HOSTINGER_BACKEND_DOMAIN/nodejs/builds" \
-    -H "Authorization: Bearer $HOSTINGER_API_TOKEN")
-  STATE=$(echo "$BUILDS" | jq -r --arg uuid "$BUILD_UUID" '.data[] | select(.uuid == $uuid) | .state')
+  # A completed build doesn't automatically restart the running process —
+  # Hostinger treats "build" and "restart" as separate operations. Without an
+  # explicit restart, the new build can sit finished-but-not-live indefinitely.
+  echo "Waiting for build $build_uuid to finish (states: pending, running, completed, failed)..."
+  for i in $(seq 1 30); do
+    builds=$(call noshow "$API_BASE/api/hosting/v1/accounts/$HOSTINGER_USERNAME/websites/$HOSTINGER_BACKEND_DOMAIN/nodejs/builds" \
+      -H "Authorization: Bearer $HOSTINGER_API_TOKEN")
+    build_obj=$(echo "$builds" | jq -c --arg uuid "$build_uuid" '.data[] | select(.uuid == $uuid)')
+    state=$(echo "$build_obj" | jq -r '.state')
 
-  if [[ "$STATE" == "completed" ]]; then
-    echo "Build completed after ~$((i * 5))s. Restarting the app..."
-    call show -X POST "$API_BASE/api/hosting/v1/accounts/$HOSTINGER_USERNAME/websites/$HOSTINGER_BACKEND_DOMAIN/nodejs/server/restart" \
-      -H "Authorization: Bearer $HOSTINGER_API_TOKEN" > /dev/null
-    echo "Restart triggered."
+    if [[ "$state" == "completed" ]]; then
+      echo "Build completed after ~$((i * 5))s. Restarting the app..."
+      call show -X POST "$API_BASE/api/hosting/v1/accounts/$HOSTINGER_USERNAME/websites/$HOSTINGER_BACKEND_DOMAIN/nodejs/server/restart" \
+        -H "Authorization: Bearer $HOSTINGER_API_TOKEN" > /dev/null
+      echo "Restart triggered."
+      return 0
+    fi
+    if [[ "$state" == "failed" ]]; then
+      echo "Build failed server-side. Full build record: $build_obj" >&2
+      return 1
+    fi
+
+    sleep 5
+  done
+
+  echo "Build didn't reach a terminal state (last seen: '$state') within 150s. Full build record: $build_obj" >&2
+  return 1
+}
+
+MAX_ATTEMPTS=3
+for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+  if run_build_attempt; then
     exit 0
   fi
-  if [[ "$STATE" == "failed" ]]; then
-    echo "Build failed server-side (state: failed). Check hPanel's Node.js app dashboard for the build log." >&2
+  echo "Build attempt $attempt/$MAX_ATTEMPTS failed." >&2
+  if [[ "$attempt" -eq "$MAX_ATTEMPTS" ]]; then
+    echo "All $MAX_ATTEMPTS build attempts failed. Check hPanel's Node.js app dashboard, or fall back to the manual upload path documented in docs/architecture.md." >&2
     exit 1
   fi
-
-  sleep 5
+  sleep 15
 done
-
-echo "Build didn't reach a terminal state (last seen: '$STATE') within 150s. Check hPanel manually." >&2
-exit 1
